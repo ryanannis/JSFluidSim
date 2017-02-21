@@ -7,9 +7,8 @@ const particles = [];
 /* Simulation Constants */
 const timestep = 1/30;
 const solverIterations = 20;
-const kernelSizeSquare = 0.1;
 const particleMass = 1;
-const h = 0.1;
+const h = 1;
 
 /* Physical constraints and constants */
 const gravity = 9.81;
@@ -41,7 +40,7 @@ const findNeighbours = (index) => {
         }
         const neighbourPos = particles[i].pos;
         const dist = (pos[0] - neighbourPos[0]) * (pos[0] -neighbourPos[0]) + (pos[1] -neighbourPos[1]) * (pos[1] -neighbourPos[1]);
-        if(dist < kernelSizeSquare){
+        if(dist < 2 * h){
             results.push(i);
         }
     }
@@ -109,7 +108,8 @@ const spikyConstraintNorm = (p1,p2) => {
         accumulator += Math.sqrt(squaredDist);
     }
     
-    console.assert(isFinite(accumulator), "Norm is not defined or zero!");
+    console.assert(isFinite(accumulator), "Norm is not defined!");
+    console.assert(accumulator !== 0, "Norm is not zero!");
     return accumulator;
 }
 
@@ -144,14 +144,16 @@ const simulate = () => {
                 density += particleMass * poly6Kernel(j, neighbours[q]);
             }
 
+            console.assert(isFinite(density), "Particle density is not defined");
+            //console.log(norm);
+
             const C = density/particleMass - 1;
 
             lambda[j] = C / norm;
 
-            
+            console.assert(isFinite(C / norm), 'lambda value is not finite');
         }
 
-        const deltaP = new Array(particles.length);
         for(let j = 0; j < particles.length; j++){
             const particle = particles[j];
             const neighbours = particle.neighbours;
@@ -167,24 +169,31 @@ const simulate = () => {
             dp[0] /= particleMass;
             dp[1] /= particleMass;
 
-            /* Apply the correction */
-            particle.newPos[0] != dp[0];
-            particle.newPos[1] != dp[1];
+            console.log(dp);
 
+            /* Apply the correction */
+            particle.newPos[0] = dp[0];
+            particle.newPos[1] = dp[1];
+
+            console.assert(isFinite(dp[0]) && isFinite(dp[1]), 'Position update is not finite');
+            
             /* We are lazy for the 2d demo so just clamp the particles 
              * to the edge of the box */
-            if(particle.newPos[0] > bounds[0]){
-                particle.newPos[0] = bounds[0];
-            }
-            if(particle.newPos[0] < -bounds[0]){
-                particle.newPos[0] = -bounds[0];
-            }
-            if(particle.newPos[1] > bounds[1]){
-                particle.newPos[1] = bounds[1];
-            }
-            if(particle.newPos[1] < -bounds[1]){
-                particle.newPos[1] = -bounds[1];
-            }
+            
+            
+                if(particle.newPos[0] > bounds[0]){
+                    particle.newPos[0] = bounds[0];
+                }
+                if(particle.newPos[0] < -bounds[0]){
+                    particle.newPos[0] = -bounds[0];
+                }
+                if(particle.newPos[1] > bounds[1]){
+                    particle.newPos[1] = bounds[1];
+                }
+                if(particle.newPos[1] < -bounds[1]){
+                    particle.newPos[1] = -bounds[1];
+                }
+            
         }
     }
 
