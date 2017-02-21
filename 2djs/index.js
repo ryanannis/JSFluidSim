@@ -34,6 +34,20 @@ const findNeighbours = (index) => {
     return results;
 };
 
+const poly6Kernel = (r,h) => {
+    if( r >= 0 && r <= h ){
+        return ( 315/(64 * pi * Math.pow(h,9)) * Math.pow(h*h - r*r, 3) );
+    }
+    return 0;
+}
+
+const spikyKernel = (r,h) => {
+    if( r >= 0 && r <= h ){
+        return ( 15/(pi * Math.pow(h,6)) * Math.pow(h - r, 3) );
+    }
+    return 0;
+}
+
 const simulate = () => {
     for(let i = 0; i < particles.length; i++){
         /* Apply Forces to Particle, Just Gravity for Now */
@@ -42,10 +56,12 @@ const simulate = () => {
     }
     
 
+    /* Find all neighbours of each particle*/
     for(let i = 0; i < particles.length; i++){
         particles[i].neighbours = findNeighbours(i);
     }
 
+    /* Apply incompressibility solver to each particle*/
     for(let i = 0; i < solverIterations; i++){
         for(let j = 0; j < particles.length; j++){
             // Calculate Lambda
