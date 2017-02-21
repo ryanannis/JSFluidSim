@@ -12,15 +12,16 @@ const particleMass = 1;
 const h = 0.1;
 
 /* Physical constraints and constants */
-const gravity = -9.81;
+const gravity = 9.81;
 const bounds = [1.0, 1.0]; //The fluid is bounded in a 1m^2 box
 
 const initialiseParticles = () => {
     for(let i = 2; i < 20; i++){
         particles.push(
             {
-                pos: [i / 20, 0.5],
+                pos: [Math.random(), Math.random()],
                 vel: [0, 0],
+                newPos: [0, 0],
             }
         )
     }
@@ -35,9 +36,12 @@ const findNeighbours = (index) => {
 
     for(let i = 0; i < particles.length; i++){
         /* Calculate eulerian distance */
-        if(index === i) continue;
+        if(index === i){
+            continue;
+        }
         const neighbourPos = particles[i].pos;
-        if((pos.x -neighbourPos.x) * (pos.x -neighbourPos.x) + (pos.y -neighbourPos.y) * (pos.y -neighbourPos.y) < kernelSizeSquare){
+        const dist = (pos[0] - neighbourPos[0]) * (pos[0] -neighbourPos[0]) + (pos[1] -neighbourPos[1]) * (pos[1] -neighbourPos[1]);
+        if(dist < kernelSizeSquare){
             results.push(i);
         }
     }
@@ -50,10 +54,10 @@ const poly6Kernel = (p1, p2) => {
     const pos1 = particles[p1].newPos;
     const pos2 = particles[p2].newPos;
 
-    const r = Math.sqrt(Math.pow(pos1[0] - pos2[0], 2) - Math.pow(pos1[1] - pos2[1], 2));
+    const r = Math.sqrt(Math.pow(pos1[0] - pos2[0], 2) + Math.pow(pos1[1] - pos2[1], 2));
 
     if( r >= 0 && r <= h ){
-        return ( 315/(64 * pi * Math.pow(h,9)) * Math.pow(h*h - r*r, 3) );
+        return ( 315/(64 * Math.PI * Math.pow(h,9)) * Math.pow(h*h - r*r, 3) );
     }
     return 0;
 }
@@ -61,23 +65,29 @@ const poly6Kernel = (p1, p2) => {
 /* Returns the scaling coefficient for the Spiky Kernel's gradient
  * (still need to provide unit vector) */
 const spikyKernelGradient = (p1, p2) => {
+    console.assert(p1 !== p2, "Spiky Kernel Gradient passed identical parameters!");
+
     const pos1 = particles[p1].newPos;
     const pos2 = particles[p2].newPos;
 
-    const r = Math.sqrt(Math.pow(pos1[0] - pos2[0], 2) - Math.pow(pos1[1] - pos2[1], 2));
+    const r = Math.sqrt(Math.abs(Math.pow(pos1[0] - pos2[0], 2) - Math.pow(pos1[1] - pos2[1], 2)));
 
     let scale = 0;
 
-    if( r >= 0 && r <= h ){
-       scale = -45 / (Math.pi * Math.pow(h,6)) * Math.pow(h - r, 2)/2 * 1/r;
-    }
+    scale = -45 / (Math.PI * Math.pow(h,6)) * Math.pow(h - r, 2)/2 * 1/r;
 
     /* Adjust by particle mass (density, rho_0) */
     scale *= 1/particleMass;
 
+    const dx = 1/particleMass * scale * (pos1[0] - pos2[0]);
+    const dy = 1/particleMass * scale * (pos1[1] - pos2[1]);
+
+    console.assert(isFinite(dx), "Undefined value passed into Spiky Kernel Gradient!");
+    console.assert(isFinite(dy), "Undefined value passed into Spiky Kernel Gradient!");
+
     return [
-        1/particleMass * scale * (pos1[0] - pos2[0]),
-        1/particleMass * scale * (pos1[1] - pos2[1])
+        dx,
+        dy
     ];
 }
 
@@ -88,7 +98,7 @@ const spikyConstraintNorm = (p1,p2) => {
     if(p1 === p2){
         const neighbours = particles[p1].neighbours;
         for(let i = 0; i < neighbours.length; i++){
-            const gradient = spikyKernelGradient(p1, i);
+            const gradient = spikyKernelGradient(p1, neighbours[i]);
             const squaredDist = gradient[0] * gradient[0] + gradient[1] * gradient[1] 
             accumulator += Math.sqrt(squaredDist);
         }
@@ -98,13 +108,15 @@ const spikyConstraintNorm = (p1,p2) => {
         const squaredDist = gradient[0] * gradient[0] + gradient[1] * gradient[1] 
         accumulator += Math.sqrt(squaredDist);
     }
+    
+    console.assert(isFinite(accumulator), "Norm is not defined or zero!");
     return accumulator;
 }
 
 const simulate = () => {
     for(let i = 0; i < particles.length; i++){
         /* Apply Forces to Particle, Just Gravity for Now */
-        particles[i].vel[1] += timeStep * gravity;
+        particles[i].vel[1] += timestep * gravity;
 
         /* Set estimate of particle update position */
         particles[i].newPos[0] = particles[i].pos[0] + timestep * particles[i].vel[0];
@@ -118,7 +130,6 @@ const simulate = () => {
 
     /* Apply incompressibility solver to each particle*/
     for(let i = 0; i < solverIterations; i++){
-
         /* Calculate lambda (scaling constant along gradient of constraint) for each particle*/
         const lambda = new Array(particles.length);
         for(let j = 0; j < particles.length; j++){
@@ -130,12 +141,14 @@ const simulate = () => {
 
             /* Sum over particles to get density */
             for(let q = 0; q < neighbours.length; q++){
-                density += particleMass * poly6Kernel(j, q);
+                density += particleMass * poly6Kernel(j, neighbours[q]);
             }
 
             const C = density/particleMass - 1;
 
             lambda[j] = C / norm;
+
+            
         }
 
         const deltaP = new Array(particles.length);
@@ -146,8 +159,8 @@ const simulate = () => {
             let dp = [0, 0];
             /* Sum over neighbours corrections */
             for(let q = 0; q < neighbours.length; q++){
-                const lambdaSum = lambda[j] + lambda[i];
-                const deltaW = spikyKernelGradient(j, q);
+                const lambdaSum = lambda[j] + lambda[q];
+                const deltaW = spikyKernelGradient(j, neighbours[q]);
                 dp[0] += deltaW[0] * lambdaSum;
                 dp[1] += deltaW[1] * lambdaSum;
             }
@@ -161,16 +174,16 @@ const simulate = () => {
             /* We are lazy for the 2d demo so just clamp the particles 
              * to the edge of the box */
             if(particle.newPos[0] > bounds[0]){
-                particle.newPos = bounds[0];
+                particle.newPos[0] = bounds[0];
             }
             if(particle.newPos[0] < -bounds[0]){
-                particle.newPos = -bounds[0];
+                particle.newPos[0] = -bounds[0];
             }
             if(particle.newPos[1] > bounds[1]){
-                particle.newPos = bounds[1];
+                particle.newPos[1] = bounds[1];
             }
             if(particle.newPos[1] < -bounds[1]){
-                particle.newPos = -bounds[1];
+                particle.newPos[1] = -bounds[1];
             }
         }
     }
@@ -203,4 +216,3 @@ stepper.onclick = () => {
 /* Initial render*/
 initialiseParticles();
 render();
-console.log('faggot');
