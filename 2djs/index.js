@@ -1,3 +1,4 @@
+const stepper = document.getElementById('stepper');
 const canvas = document.getElementById('display');
 const ctx = canvas.getContext('2d');
 
@@ -5,7 +6,7 @@ const particles = [];
 
 /* Simulation Constants */
 const timestep = 1/30;
-const solverIterations = 10;
+const solverIterations = 20;
 const kernelSizeSquare = 0.1;
 const particleMass = 1;
 const h = 0.1;
@@ -15,7 +16,14 @@ const gravity = -9.81;
 const bounds = [1.0, 1.0]; //The fluid is bounded in a 1m^2 box
 
 const initialiseParticles = () => {
-
+    for(let i = 2; i < 20; i++){
+        particles.push(
+            {
+                pos: [i / 20, 0.5],
+                vel: [0, 0],
+            }
+        )
+    }
 };
 
 /* Use naive O(n) method for now.
@@ -99,8 +107,8 @@ const simulate = () => {
         particles[i].vel[1] += timeStep * gravity;
 
         /* Set estimate of particle update position */
-        particles[i].newPos[0] += timestep * particles[i].pos.vel[0];
-        particles[i].newPos[1] += timestep * particles[i].pos.vel[1];
+        particles[i].newPos[0] = particles[i].pos[0] + timestep * particles[i].vel[0];
+        particles[i].newPos[1] = particles[i].pos[1] + timestep * particles[i].vel[1];
     }
 
     /* Find all neighbours of each particle*/
@@ -179,9 +187,20 @@ const simulate = () => {
 };
 
 const render = () => {
-    // For the basic CPU version, for each particle just draw a small circle
+    for(let i = 0; i < particles.length; i++){
+        const particle = particles[i];
+        ctx.beginPath();
+        ctx.arc(particle.pos[0] * 500, particle.pos[1] * 500 ,10,0,2*Math.PI);
+        ctx.stroke();
+    }
 }
 
-const tick = () => {
-
+stepper.onclick = () => {
+    simulate();
+    render();
 }
+
+/* Initial render*/
+initialiseParticles();
+render();
+console.log('faggot');
