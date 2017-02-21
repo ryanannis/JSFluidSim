@@ -7,6 +7,7 @@ const particles = [];
 const timestep = 1/30;
 const solverIterations = 10;
 const kernelSizeSquare = 0.1;
+const particleMass = 1;
 
 /* Physical constraints and constants */
 const gravity = 9.81;
@@ -34,25 +35,57 @@ const findNeighbours = (index) => {
     return results;
 };
 
-const poly6Kernel = (r,h) => {
+/* Returns the scaling coefficient for the Poly6 Kernel's 
+ * (still need to provide unit vector) */
+const poly6Kernel = (r, h) => {
     if( r >= 0 && r <= h ){
         return ( 315/(64 * pi * Math.pow(h,9)) * Math.pow(h*h - r*r, 3) );
     }
     return 0;
 }
 
-const spikyKernel = (r,h) => {
+/* Returns the scaling coefficient for the Spiky Kernel's gradient
+ * (still need to provide unit vector) */
+const spikyKernelGradient = (p1, p2) => {
+    const pos1 = particles[p1].newPos;
+    const pos2 = particles[p2].newPos;
+
+    const r = Math.sqrt(Math.pow(pos1[0] - pos2[0], 2) - Math.pow(pos1[1] - pos2[1], 2));
+
+    let scale = 0;
+
     if( r >= 0 && r <= h ){
-        return ( 15/(pi * Math.pow(h,6)) * Math.pow(h - r, 3) );
+       scale = -45 / (Math.pi * Math.pow(h,6)) * Math.pow(h - r, 2)/2 * 1/r;
     }
-    return 0;
+
+    return [scale * (pos2[0].x - pos1[0].x), scale * (pos2[1] - pos1[0])];
+}
+
+/* Returns the Norm of constaint function C1 with respect to particle P2 */
+const spikyConstraintNorm = (p1,p2) => {
+    let accumulator = 0;
+    /* Sum over neighbours if p1=p2 */
+    if(p1 === p2){
+        const neighbours = particles[p1].neighbours;
+        for(let i = 0; i < neighbours.length; i++){
+            const gradient = spikyKernelGradient(p1, i);
+            const squaredDist = gradient[0] * gradient[0] + gradient[1] * gradient[1] 
+            accumulator += Math.sqrt(squaredDist);
+        }
+    } else {
+        /* Else just return the gradient with respect to p2 */
+        const gradient = spikyKernelGradient(p1, p2);
+        const squaredDist = gradient[0] * gradient[0] + gradient[1] * gradient[1] 
+        accumulator += Math.sqrt(squaredDist);
+    }
+    return accumulator;
 }
 
 const simulate = () => {
     for(let i = 0; i < particles.length; i++){
         /* Apply Forces to Particle, Just Gravity for Now */
-        particles[i].v += timeStep * gravity;
-        particles[i].xEst += timestep * particles[i].v;
+        particles[i].vel += timeStep * gravity;
+        particles[i].newPos += timestep * particles[i].v;
     }
     
 
