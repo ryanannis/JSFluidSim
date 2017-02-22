@@ -9,9 +9,9 @@ const timestep = 1/60;
 const solverIterations = 10;
 const restDensity = 1000;
 const particleMass = 1;
-const kernelRadius = 1;
+const kernelRadius = 0.1;
 
-const numParticles = 100;
+const numParticles = 1000;
 
 /* Physical constraints and constants */
 const gravity = vec2.fromValues(0, 0);
@@ -84,6 +84,7 @@ const calculateDensities = () => {
             rhoSum += poly6(p1.newPos, p2.newPos); 
         });
         p1.density = rhoSum;
+        //console.log(p1.density);
     });
 }
 
