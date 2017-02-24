@@ -13,7 +13,7 @@ const particleMass = 1;
 const kernelRadius = 0.1;
 const epsilon = 500;
 
-const numParticles = 50;
+const numParticles = 100;
 
 /* Physical constraints and constants */
 const gravity = vec2.fromValues(0, 9.8);
@@ -50,7 +50,7 @@ const spiky = (p1, p2) => {
         return vec2.fromValues(0, 0);
     }
 
-    const result = -45.0 / (Math.PI * Math.pow(kernelRadius, 6)) * Math.pow( kernelRadius * kernelRadius - vec2.len(r) * vec2.len(r), 2) * 1 / ( vec2.len(r));
+    const result = -45.0 / (Math.PI * Math.pow(kernelRadius, 6)) * Math.pow( kernelRadius * kernelRadius - vec2.len(r) * vec2.len(r), 2) * 1 / vec2.len(r);
     
     vec2.scale(r, r, result);
     console.assert(isFinite(result), "spiky not finite");
@@ -85,6 +85,7 @@ const calculateDensities = () => {
             rhoSum += poly6(p1.newPos, p2.newPos); 
         });
         p1.density = rhoSum;
+        //console.log(rhoSum);
     });
 }
 
@@ -105,8 +106,9 @@ const calculateLambda = () => {
             vec2.add(gradientKI, gradientKI, gradient);
         });
 
-        gradientSum += vec2.len(gradientKI) * vec2.len(gradientKI);
+       // console.log(constraint);
 
+        gradientSum += vec2.len(gradientKI) * vec2.len(gradientKI);
         p1.lambda = - constraint / (gradientSum + epsilon);
     });
 }
@@ -120,17 +122,15 @@ const calculateDeltaP = () => {
             vec2.scaleAndAdd(lambdaSum, lambdaSum, gradient, p1.lambda + p2.lambda);
         });
         vec2.scale(p1.deltaP, lambdaSum, 1 / restDensity );
-    });
-};
-
-const adjustDeltaP = () => {
-    particles.forEach((p1) => {
         vec2.add(p1.newPos, p1.newPos, p1.deltaP);
     });
 };
 
 const updatePosition = () => {
     particles.forEach((p1) => {
+        vec2.scaleAndAdd(p1.vel, p1.newPos, p1.pos, -1);
+        //console.log(p1.vel);
+        vec2.scale(p1.vel, p1.vel, 1/timestep);
         p1.pos = p1.newPos;
     });
 };
@@ -138,17 +138,17 @@ const updatePosition = () => {
 const constrainParticles = () => {
      particles.forEach((p1) => {
          //console.log(p1.pos);
-         if(p1.pos[0] > 1){
-             p1.newPos[0] =  1 - 0.001 * Math.random();
+         if(p1.newPos[0] > 1){
+             p1.newPos[0] =  1;
          }
-         if(p1.pos[0] < 0){
-             p1.newPos[0] =  0.001 * Math.random();
+         if(p1.newPos[0] < 0){
+             p1.newPos[0] =  0.000;
          }
-         if(p1.pos[1] < 0){
-             p1.newPos[1] = 0.001 * Math.random();
+         if(p1.newPos[1] < 0){
+             p1.newPos[1] = 0.00;
          }
-         if(p1.pos[1] > 1){
-             p1.newPos[1] =  1 - 0.001 * Math.random();
+         if(p1.newPos[1] > 1){
+             p1.newPos[1] = 1;
          }
      });
 };
@@ -171,10 +171,10 @@ const simulate = () => {
         calculateDensities();
         calculateLambda();
         calculateDeltaP();
-        adjustDeltaP();
         constrainParticles();
     }
     updatePosition();
+    //console.log(particles);
 }
 
 simulateAll.onclick = () => {
